@@ -1,0 +1,194 @@
+1. Rol y objetivo
+Actúa como arquitecto y desarrollador Android senior, con experiencia en asistentes de voz, accesibilidad y apps para adultos mayores. Vamos a construir juntos, paso a paso, una app Android de compañía por voz para mi abuela de 90 años. Quiero que primero entiendas el proyecto completo, me hagas las preguntas de la sección 19 y propongas un plan; no escribas código hasta que yo apruebe el plan.
+El objetivo es que mi abuela pueda platicar con la app usando solo la voz, que la acompañe, la estimule mentalmente, le recuerde sus cosas y le ayude a comunicarse con la familia, con el menor costo posible y sin depender totalmente de internet.
+2. Contexto de la usuaria final y de la familia
+• Mi abuela tiene 90 años, es católica, muy lúcida y se queda sola en muchos ratos. Quiero que tenga alguien con quien conversar para sentirse menos sola.
+• Su visión no es buena: la experiencia debe ser de audio primero, sin exigirle leer la pantalla. La pantalla, si se usa, solo muestra elementos enormes y de apoyo, nunca algo imprescindible.
+• Tiene dificultades motoras: evitar gestos finos, toques precisos o arrastres.
+• Escucha la misa por YouTube en una tablet Android. En su casa ya hay Alexa y focos inteligentes.
+• Habla español de México. La app debe sentirse cálida, paciente y respetuosa, y tratarla de «usted» o de «tú» según se configure.
+• Los familiares usan WhatsApp para comunicarse con ella.
+• Dispositivo objetivo: una tablet Android conectada a la corriente en un soporte. El modelo, la RAM y la versión de Android están por confirmar (ver sección 19).
+3. Alcance de esta entrega
+Dentro del alcance: asistente de voz completo (palabra clave, conversación, recordatorios, rezo, juegos, búsqueda web hablada, música, mensajes, emergencia, registro de conversaciones y configuración para la familia).
+Fuera del alcance por ahora: el launcher personalizado de la tablet. Más adelante lo integraremos, así que diseña la app como un módulo independiente: una Application normal con su servicio de voz, sin suponer que será la pantalla de inicio. Deja una interfaz clara (por ejemplo un AssistantController que expone «iniciar escucha», «detener», «estado») para que un launcher futuro pueda controlarla.
+También fuera: generación de imágenes, páginas web o cualquier contenido visual complejo. Solo conversación, voz y control del dispositivo.
+4. Principios de diseño no negociables
+1. La voz es la interfaz principal. Todo debe poder hacerse hablando y escuchando.
+2. Costo mínimo. Preferir componentes locales y gratuitos. Cualquier servicio de pago debe ser opcional y estar aislado detrás de una interfaz para poder cambiarlo.
+3. Lo crítico no depende de la IA. Recordatorios, llamadas, mensajes y emergencia se ejecutan con reglas fijas y código determinista. La IA solo conversa y responde preguntas.
+4. Degradación elegante. Sin internet o sin luz, la app sigue funcionando con lo local y se lo dice con claridad a mi abuela.
+5. Privacidad primero. Datos locales, cifrados, mínimos. Registro de conversaciones en texto, no grabaciones de audio.
+6. Transparencia y honestidad. Ella sabe que habla con una IA. La app nunca finge ser una persona ni sustituye a la familia, sino que la empuja hacia ella.
+7. Paciencia ante todo. Nunca apurar, nunca corregir con dureza, siempre permitir repetir.
+8. Fiabilidad sobre novedad. Prefiere soluciones aburridas y estables antes que trucos frágiles.
+5. Arquitectura propuesta
+Propón y justifica tu propia versión, partiendo de esta base:
+Plataforma: Android nativo con Kotlin. Interfaz mínima con Jetpack Compose (solo para configuración y estado). Verifica en la documentación oficial las versiones vigentes de SDK, librerías y requisitos antes de fijar nada; no asumas APIs de memoria.
+Flujo principal:
+1. Un servicio en primer plano (foreground service con tipo micrófono) escucha de forma continua solo la palabra clave, en el dispositivo.
+2. Al detectar la palabra clave se reproduce un tono breve y se activa el reconocimiento de voz (STT).
+3. El texto pasa por un enrutador de intenciones con reglas deterministas (sección 7).
+4. Si la intención es una acción conocida (recordatorio, llamada, mensaje, música, emergencia), se ejecuta con código fijo.
+5. Si es conversación o una pregunta abierta, se envía al motor de IA (nube o local, sección 10).
+6. La respuesta pasa a texto a voz (TTS), hablada despacio y con claridad.
+7. La conversación se registra en texto en la base de datos local.
+Módulos separados (cada uno con su interfaz, para poder cambiar implementaciones y probarlos aislados): wakeword, stt, tts, router, ai, reminders, prayer, games, search, music, messaging, emergency, storage, family-config, device-control.
+Inyección de dependencias con una solución estándar (Hilt o Koin, elige y justifica). Corrutinas y Flow para lo asíncrono. Room para la base de datos.
+6. Canal de voz
+Palabra clave (wake word).
+• Debe correr 100% local. Evalúa openWakeWord, Porcupine (revisa su licencia y límites en el plan gratuito) y alternativas con Vosk. Compara precisión, consumo de batería y facilidad para una palabra personalizada.
+• La palabra clave la elige la familia en la configuración; sugiere una de 3 o 4 sílabas, fácil de pronunciar y poco común en la conversación normal para evitar falsos positivos.
+• Ofrece un ajuste de sensibilidad y registra en local los falsos positivos y falsos negativos (solo contadores) para afinar.
+Reconocimiento de voz (STT).
+• Preferir reconocimiento local en español: Vosk, Whisper pequeño o el reconocimiento offline de Android. Si hay internet, permite un STT en la nube como opción de mayor calidad.
+• Usar detección de actividad de voz (VAD) para saber cuándo ella terminó de hablar. Tiempo de espera generoso (ella habla despacio y hace pausas): no cortarla a los dos segundos.
+• Manejar silencios: si no dice nada tras el tono, preguntar con suavidad una vez («¿Sigue ahí? Dígame cuando quiera») y volver a escuchar la palabra clave.
+Texto a voz (TTS).
+• Usar TTS local en español de México (TTS de Android o Piper con voz es_MX; evalúa naturalidad y latencia).
+• Velocidad más lenta que la normal, ajustable por la familia, con volumen alto y pausas naturales entre frases. Frases cortas.
+• Barge-in: si ella habla mientras la app habla, la app calla y la escucha.
+• Si hay un audio familiar o música sonando, bajar el volumen mientras ella habla (audio ducking).
+Entorno.
+• Tolerar ruido de televisión o de la casa. Ofrece un modo configurable para pedirle que repita si la confianza del STT es baja, en lugar de adivinar.
+• Contempla que ella puede tener algo de pérdida auditiva: salida clara, sin fondos musicales, y una orden «más fuerte» o «más despacio» que ajuste volumen y velocidad.
+7. Enrutador de intenciones
+Una capa de reglas antes de la IA. Para cada intención define frases de ejemplo en español coloquial mexicano, variantes y sinónimos, y la acción. Intenciones mínimas:
+• EMERGENCIA: «ayuda», «me caí», «llama a mi hija, me siento mal». Máxima prioridad, siempre evaluada primero.
+• LLAMAR, MENSAJE_ENVIAR, MENSAJE_LEER, MENSAJE_GRABAR
+• RECORDATORIO_CREAR, RECORDATORIO_CONSULTAR, RECORDATORIO_CANCELAR
+• MUSICA_PONER, MUSICA_PAUSAR, MUSICA_SIGUIENTE
+• MISA, REZAR, EVANGELIO
+• JUEGO
+• CLIMA, NOTICIAS, BUSCAR
+• HORA_FECHA
+• VOLUMEN_MAS, VOLUMEN_MENOS, MAS_DESPACIO, REPETIR
+• CONVERSAR (por defecto, va a la IA)
+Cuando haya ambigüedad (por ejemplo dos contactos con el mismo nombre), la app pregunta de vuelta con opciones habladas simples y espera confirmación antes de actuar. Para acciones con efecto (enviar un mensaje, llamar), repite lo que va a hacer y pide un «sí» antes de ejecutarlo, salvo en emergencias.
+El enrutador puede combinar reglas y un clasificador ligero, pero debe ser predecible y estar cubierto por pruebas con un conjunto grande de frases.
+8. Funciones, una por una
+8.1 Controles diarios proactivos. La app inicia conversaciones breves y amables en horarios que se ajustan a la rutina (por ejemplo «buenos días», después de comer, antes de dormir). Requisitos:
+• Horarios configurables por la familia y aprendidos de forma sencilla de su rutina, sin invadir. Nunca durante la misa o cuando ella haya pedido silencio.
+• Si ella no responde a un check-in clave, avisar a un familiar (alerta de inactividad), con umbrales y reintentos configurables.
+• El tono varía para no ser repetitivo: puede preguntar por su descanso, comida, ánimo, recordar el santo del día o comentar el clima.
+• Un modo «no molestar» que ella pueda activar por voz.
+8.2 Conversaciones interesantes. Conversación natural, adaptada a sus gustos (la familia puede cargar temas favoritos: su familia, su pueblo, su cocina, su historia, música de su época). Debe recordar lo hablado en conversaciones anteriores mediante un resumen local corto, sin enviar datos sensibles innecesarios a la nube. Respuestas cortas, cálidas, con preguntas de seguimiento sencillas, sin tecnicismos.
+8.3 Cápsula de memorias. Modo en el que ella cuenta historias de su vida y la app las guarda como texto organizado por tema y época, con su permiso. Más adelante la familia puede exportarlas como un «libro de la abuela». Para esto la app hace preguntas abiertas y respetuosas, nunca presiona sobre recuerdos dolorosos.
+8.4 Juegos mentales por voz. Juegos sin pantalla: completar refranes, adivinar canciones y artistas de su época, trivia de historia y cultura de México, cadena de palabras, memoria (repetir secuencias de palabras o números cortos), adivinanzas, «¿qué hay en la cocina?». Niveles de dificultad suaves, nunca humillantes: si falla, la app anima y da una pista. Registrar de forma agregada su desempeño (opcional y visible para la familia) para ver tendencias, sin dar diagnósticos médicos.
+8.5 Ora y reflexiona.
+• Rosario guiado (misterios según el día de la semana), Ángelus, oraciones comunes (Padre Nuestro, Ave María, Gloria, Salve) y la Coronilla de la Divina Misericordia.
+• Evangelio y santo del día, con reflexión breve. Para el contenido litúrgico, define una fuente confiable y verifica qué se puede usar legalmente; no inventes ni parafrasees textos litúrgicos de memoria, usa fuentes citables o contenido de dominio público.
+• Abrir la misa en YouTube: enlace directo al canal y la transmisión que ella ya ve, configurable por la familia, con el horario de la parroquia.
+• Tono respetuoso con su fe, sin sermonear ni opinar en temas doctrinales. Si ella pregunta algo doctrinal profundo, sugerir hablar con su párroco.
+8.6 Búsqueda y respuestas en la web.
+• Clima: usa una API gratuita sin clave (por ejemplo Open-Meteo) con su ubicación configurada.
+• Noticias: fuentes RSS configurables por la familia, resumidas en voz en dos o tres frases, indicando la fuente.
+• Preguntas cotidianas: la IA en la nube con apoyo de búsqueda cuando haya internet. Evalúa las opciones gratuitas y sus condiciones de privacidad actuales (algunas capas gratuitas pueden usar los datos para entrenamiento) y documenta la decisión.
+• Si no hay internet, decirlo con naturalidad y ofrecer lo que sí puede hacer.
+• Temas sensibles (salud, dinero, legal, estafas): respuestas cautas, sin diagnósticos ni recomendaciones de inversión, y sugerir consultar a su familia o su médico.
+8.7 Música.
+• Amazon Music no ofrece una API abierta para control de reproducción. Investiga qué es realista: controlar apps ya instaladas mediante MediaSession/teclas multimedia, abrir búsquedas con intents o accesibilidad, y YouTube o YouTube Music como alternativa principal.
+• Funciones: poner una canción o artista, pausar, siguiente, volumen, y ayudarla a recordar una canción («esa que dice...»): la IA propone candidatas y ella confirma por voz.
+• Documenta las limitaciones y propón una alternativa de respaldo (por ejemplo una lista local con archivos de audio que la familia suba).
+8.8 Recordatorios.
+• Medicamentos (dosis, horario, repetición, confirmación de «ya la tomé»), citas médicas, cumpleaños y rutinas.
+• Deterministas y confiables: se programan con AlarmManager exacto o equivalente y sobreviven a reinicios. Verifica los permisos y restricciones de Android sobre alarmas exactas y batería.
+• Recordatorio hablado, amable y repetido hasta confirmar; si no hay confirmación en un tiempo configurable, avisar a la familia.
+• Los crea la familia en la configuración o ella por voz («recuérdame mañana a las 10 mi cita»). La app repite y confirma antes de guardar.
+• Registro de si se confirmó o no cada medicamento, visible para la familia.
+8.9 Mensajes familiares.
+• Enviar y recibir por voz: «mándale un mensaje a [nombre], dile que estoy bien y que me llame más tarde».
+• Contactos favoritos configurados por la familia, con apodos (por ejemplo «mi hija Fulanita»).
+• Enviar por WhatsApp: no existe una API oficial para cuentas personales. Investiga y propón la mejor ruta: abrir el chat con el texto prellenado mediante intent y pulsar «enviar» con un AccessibilityService. Explica la fragilidad (cambios de la interfaz de WhatsApp) y diseña un módulo aislado con pruebas y un modo de falla claro, donde la app dice «no pude enviarlo, voy a llamar a su hija».
+• Recibir: leer las notificaciones de WhatsApp con un NotificationListenerService y leerlas en voz alta, preguntando si quiere responder.
+• Audios para la familia: solo cuando ella lo pida («quiero grabar un mensaje para mis hijos»), la app graba, le da a escuchar, pide confirmación y lo comparte por WhatsApp. Estos audios son lo único que se graba, y se borran del dispositivo después de enviados, según un ajuste.
+• Alternativa a evaluar: un canal propio o un bot de Telegram para la familia, mucho más estable por tener API oficial. Compara y recomienda.
+9. Control de la tablet
+Explica qué se puede y qué no, y diseña con estas piezas:
+• Intents estándar para llamadas (con el permiso necesario; considera que la tablet puede no tener SIM) y para abrir apps.
+• AccessibilityService para tocar botones en otras apps (como «enviar» en WhatsApp). Documenta el consentimiento y el aviso claro de lo que hace, y que solo actúa cuando ella lo ordena.
+• NotificationListenerService para leer notificaciones.
+• Modo quiosco o fijación de pantalla como opción (se valora más tarde con el launcher).
+• Ahorro de batería: pedir exclusión de optimizaciones y comprobar el comportamiento en Android reciente.
+• Instalación: la app será de uso familiar, se instalará por APK directo (sideload) y no por Google Play. Documenta cómo instalar y actualizar de forma simple para la familia.
+10. Motor de IA
+Estrategia híbrida:
+• Con internet: un modelo en la nube para conversación y búsqueda. Elige un proveedor con capa gratuita o costo muy bajo, y aísla el proveedor detrás de una interfaz LlmProvider para poder cambiarlo. Verifica límites, precios y políticas de datos vigentes en su documentación antes de decidir y deja los límites como configuración.
+• Sin internet: un modelo local pequeño (1B a 3B parámetros; evalúa opciones como Gemma o Qwen con MediaPipe LLM Inference, llama.cpp u otra). Su español puede ser mediocre y responderá más lento. Úsalo solo como respaldo básico para charla sencilla, y mide latencia, temperatura del equipo y consumo en la tablet real.
+• Decisión automática según conectividad y calidad de la conexión, con transición suave y aviso hablado cuando cambie el modo.
+Prompt de sistema base (en español, a refinar):
+Eres «[nombre del asistente]», una compañía de voz para [nombre de la abuela], una señora de 90 años, católica, que a veces está sola. Habla siempre en español de México, con frases cortas, cálidas y claras, a ritmo lento. Eres paciente: si ella repite algo, responde como si fuera la primera vez. No uses palabras técnicas ni anglicismos. Haz como máximo una pregunta a la vez. Anímala a platicar, recordar y a comunicarse con su familia. Si no estás segura de algo, dilo. No des diagnósticos, dosis ni cambios de medicinas; ante cualquier malestar, sugiere avisar a su familia o a su médico. No opines sobre política ni doctrina; respeta su fe. Nunca finjas ser una persona: si te lo pregunta, di con cariño que eres una asistente de inteligencia artificial. No sustituyas a su familia: impúlsala a llamarles. Si menciona que se siente muy mal, que se cayó o que tiene miedo, activa el protocolo de ayuda.
+Herramientas (function calling) que el modelo puede invocar, siempre validadas por código: consultar clima, buscar información, proponer una canción, guardar una nota de memoria, y solicitar una acción al enrutador. El modelo nunca ejecuta por sí solo llamadas, mensajes ni emergencias sin pasar por las confirmaciones de la sección 7.
+Seguridad del modelo: filtros de salida para temas peligrosos, límites de longitud, y manejo de «alucinaciones»: ante datos de salud, dinero o legales, respuesta prudente y derivación a la familia. Evita el exceso de halagos y no fomentar dependencia emocional: la app celebra sus logros y la empuja hacia sus personas.
+11. Datos, registro y privacidad
+• Registro de conversaciones en texto (no audio), local, con marca de tiempo, intención detectada y resumen corto. Esquema Room sugerido: Conversation, Message, Reminder, ReminderEvent (cumplido o no), Contact, MemoryCapsule, GameResult, EmergencyEvent, Setting.
+• Cifrado en reposo (SQLCipher o cifrado de Android con claves en Keystore). Respaldo opcional y cifrado, solo si la familia lo configura.
+• Retención configurable (por ejemplo 90 días de transcripciones completas y resúmenes permanentes), con un botón para borrar todo.
+• Consentimiento: al inicio, la familia explica a mi abuela qué se guarda y quién puede verlo, y ella da su visto bueno. La app debe poder decir en voz alta qué guarda si ella lo pregunta.
+• Mínimo de datos a la nube: enviar solo lo necesario para responder; nunca contactos completos, direcciones ni datos médicos más allá de lo indispensable, y sin identificadores directos cuando sea posible.
+• Cumple de forma razonable con buenas prácticas de privacidad para datos de salud y de personas mayores; señala dónde podrían aplicar leyes mexicanas de protección de datos personales y qué revisar con un profesional.
+12. Emergencias y caídas
+Sé honesto sobre los límites y no prometas de más:
+• La tablet no detecta caídas. El comando «ayuda» solo sirve si ella está consciente y al alcance del micrófono; un micrófono de tablet no escucha bien desde otra habitación.
+• Flujo propuesto: ella dice la frase de emergencia → la app confirma de forma corta («¿Llamo a su hija?») salvo que se detecte urgencia obvia → llama y manda un mensaje con alerta a los contactos de emergencia en orden de prioridad → si nadie contesta en un tiempo configurable, escala a otro contacto y, solo entonces y según configuración, ofrece llamar a los servicios de emergencia (911 en México). Considera que llamar al 911 automáticamente por error es un problema real, y que una tablet sin SIM puede no poder hacerlo.
+• Complementos recomendados: diseña una integración opcional con un botón de pánico o reloj con detección de caídas (por ejemplo botones Bluetooth o Zigbee, o un smartwatch) que dispare la misma rutina. Investiga las opciones y su compatibilidad. Alexa en otras habitaciones puede servir como micrófono adicional, y evalúa si hay una forma razonable de integrarla.
+• Todo evento de emergencia se registra con fecha y hora y se notifica a la familia.
+• Documenta con claridad que esta función es un apoyo y no sustituye a un sistema profesional de alerta médica.
+13. Resiliencia
+• Sin internet: funciones locales siguen activas (palabra clave, recordatorios, llamadas si hay línea, rezos, juegos básicos, modelo local) y la app lo anuncia con naturalidad.
+• Sin luz: la tablet funciona con su batería; con batería baja, la app avisa a la familia y reduce funciones no esenciales. Nunca dejar a mi abuela sin que sepa que algo no funciona: la app debe decirlo en voz alta.
+• Arranque automático al encender la tablet y al actualizar la app.
+• Watchdog: si el servicio de escucha se cae, se reinicia solo y avisa a la familia si no logra recuperarse.
+• Salud de la app: comprobaciones periódicas del micrófono, el volumen, la batería, la conectividad y los permisos; reporte simple a la familia.
+14. Configuración para la familia
+Una pantalla de administración protegida con PIN (no para ella), con textos grandes y claros. Debe permitir:
+• Palabra clave, volumen, velocidad de voz, nombre de la abuela y del asistente, tratamiento de «usted» o «tú».
+• Contactos favoritos, apodos y contactos de emergencia con prioridad.
+• Horarios de los check-ins, recordatorios, medicamentos y cumpleaños.
+• Temas de conversación, música favorita, fuentes de noticias, ubicación para el clima y horario de la misa.
+• Ver el registro de conversaciones y el resumen del día, activar o desactivar funciones y borrar datos.
+• Elegir el motor de IA, el modo local o en la nube y sus claves, y ver el consumo y el estado.
+• Opcional en una fase posterior: un panel remoto o un resumen diario enviado a la familia por mensaje.
+15. Seguridad y ética
+• Nunca engañar ni manipular a la usuaria; la app no vende ni recomienda productos.
+• Protegerla de estafas: si ella menciona llamadas sospechosas, premios, transferencias o datos bancarios, responder con cautela y avisar a la familia.
+• No sustituir contacto humano; si detecta soledad intensa o tristeza persistente, sugerir llamar a un familiar y avisar a la familia según lo configurado.
+• Ante señales de confusión nueva, cambios bruscos en su forma de hablar o de responder, no diagnosticar: solo avisar a la familia de manera discreta y respetuosa.
+• Dejar claro en la documentación que la app es una compañía y un apoyo, no un dispositivo médico.
+• La autonomía de ella es lo primero: puede apagar el registro, pedir que se olvide una conversación y decir «no quiero hablar ahora».
+16. Pruebas
+• Pruebas unitarias del enrutador de intenciones con un conjunto amplio de frases reales y regionales, incluyendo errores comunes del reconocimiento de voz.
+• Pruebas del módulo de recordatorios (reinicios, ahorro de batería, cambios de hora).
+• Pruebas del flujo de emergencia con contactos simulados.
+• Pruebas de campo en la tablet real: ruido ambiente, distancia al micrófono, latencia total de respuesta y consumo de batería durante 24 horas.
+• Un modo simulación para probar la app con texto en la computadora, sin necesidad de hablar.
+• Lista de verificación de accesibilidad: tamaños de texto, contraste, volumen, tiempos de espera.
+• Registro de métricas locales (latencia, errores del STT, falsos disparos de la palabra clave) sin datos personales.
+17. Fases y entregables
+Propón tu plan, partiendo de esta base y ajustándolo a tus hallazgos:
+• Fase 0 (investigación): verificar versiones, licencias, límites y costos reales de cada componente; probar prototipos de wake word, STT y TTS en la tablet; resumir hallazgos y riesgos.
+• Fase 1 (esqueleto confiable): servicio en primer plano, palabra clave, STT y TTS, enrutador, recordatorios, llamadas, lectura de notificaciones de WhatsApp, registro local y configuración mínima.
+• Fase 2 (compañía): conversación con IA en la nube, rezos, evangelio y misa, juegos, clima, noticias y check-ins proactivos con alerta de inactividad.
+• Fase 3 (comunicación): envío de mensajes y audios por WhatsApp, música, cápsula de memorias y resumen para la familia.
+• Fase 4 (resiliencia y seguridad): modelo local de respaldo, flujo de emergencia con complementos, watchdog, cifrado y pulido.
+• Fase 5 (futura): integración con el launcher, que está fuera de esta entrega.
+En cada fase entrega: código, pruebas, un README con instrucciones de instalación en la tablet, un archivo DECISIONES.md con lo que elegiste y por qué, y una lista de riesgos pendientes.
+18. Forma de trabajar conmigo
+• Háblame en español, de forma clara y sin tecnicismos innecesarios. Soy diseñador gráfico, no desarrollador a tiempo completo, así que explica las decisiones importantes en lenguaje simple.
+• No inventes APIs, permisos ni versiones. Si no estás seguro, consulta la documentación oficial o dímelo.
+• Antes de elegir una librería o un servicio, compárame al menos dos opciones con ventajas, costos, licencias y riesgos, y recomienda una.
+• Avanza por fases pequeñas, con algo que pueda probar en la tablet al final de cada una, y pídeme confirmación antes de decisiones que afecten costos, privacidad o seguridad.
+• Cuando algo no sea posible o sea frágil (como el envío por WhatsApp), dímelo de frente y propón alternativas.
+• Mantén el código simple, comentado donde haga falta y organizado por módulos.
+• Guarda un registro de decisiones y de tareas pendientes en el repositorio.
+19. Preguntas que debes hacerme primero
+Antes de proponer el plan, hazme estas preguntas (de una en una o agrupadas, como te parezca más claro) y espera mis respuestas:
+1. ¿Qué modelo de tablet usa mi abuela? ¿Cuánta RAM y almacenamiento tiene y qué versión de Android? ¿Tiene SIM o solo wifi?
+2. ¿Cómo prefiero llamar al asistente y cuál sería la palabra clave? ¿Quiero que ella le pueda poner un nombre?
+3. ¿Qué contactos y apodos hay, y en qué orden se avisa en una emergencia?
+4. ¿Qué presupuesto mensual máximo estoy dispuesto a gastar, si lo hay, y qué proveedores de IA ya uso o prefiero?
+5. ¿Qué canal de YouTube y qué horario de misa suele ver ella, y qué música le gusta?
+6. ¿Cómo está su conexión a internet y qué tan seguido se va la luz?
+7. ¿Quiero un resumen diario para la familia, y por qué canal?
+8. ¿Ella ya sabe de este proyecto y qué piensa? ¿Hay algo que le gustaría o no le gustaría que hiciera?
+Cuando tenga tus respuestas, presenta el plan completo con arquitectura, decisiones, riesgos y fases, y espera mi aprobación antes de escribir código.

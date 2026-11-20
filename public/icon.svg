@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563EB" />
+      <stop offset="100%" stop-color="#1E40AF" />
+    </linearGradient>
+    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#34D399" />
+      <stop offset="100%" stop-color="#10B981" />
+    </linearGradient>
+  </defs>
+  <rect x="16" y="16" width="480" height="480" rx="112" fill="url(#bgGrad)" />
+  <rect x="32" y="32" width="448" height="448" rx="96" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="4" />
+  <!-- Sound wave arcs -->
+  <path d="M138 196 C112 228 112 284 138 316" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="18" stroke-linecap="round" />
+  <path d="M374 196 C400 228 400 284 374 316" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="18" stroke-linecap="round" />
+  <path d="M98 164 C60 214 60 298 98 348" fill="none" stroke="rgba(255,255,255,0.28)" stroke-width="14" stroke-linecap="round" />
+  <path d="M414 164 C452 214 452 298 414 348" fill="none" stroke="rgba(255,255,255,0.28)" stroke-width="14" stroke-linecap="round" />
+  <!-- Bold high-contrast B badge -->
+  <text x="256" y="318" text-anchor="middle" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" font-weight="800" font-size="230" fill="#FFFFFF">B</text>
+  <!-- Active voice dot -->
+  <circle cx="384" cy="128" r="34" fill="#FFFFFF" />
+  <circle cx="384" cy="128" r="22" fill="url(#accentGrad)" />
+</svg>

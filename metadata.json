@@ -1,0 +1,6 @@
+{
+  "name": "Hey Berna - Asistente de Compañía por Voz",
+  "description": "Asistente de compañía por voz y apoyo diario para adultos mayores en tableta Xiaomi Pad 7 con salvapantallas familiar y portal remoto de gestión.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
